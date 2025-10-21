@@ -1,4 +1,5 @@
 import { createStore } from 'jotai';
+import { DevTools } from 'jotai-devtools';
 import { Provider } from 'jotai/react';
 import { ReactNode } from 'react';
 
@@ -11,5 +12,10 @@ interface JotaiProviderProps {
 }
 
 export const JotaiProvider = ({ children }: JotaiProviderProps) => {
-  return <Provider store={store}>{children}</Provider>;
+  return (
+    <Provider store={store}>
+      <DevTools />
+      {children}
+    </Provider>
+  );
 };
