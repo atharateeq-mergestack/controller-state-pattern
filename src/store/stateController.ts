@@ -14,7 +14,7 @@ export class StateController<T extends Record<string, any>> {
     initialState: T;
     private listeners: Map<keyof T, Set<StateChangeListener<T, any>>>;
 
-    constructor(name: string, initialState: T, hydrationConfig?: HydrationConfig<T>) {
+    constructor(name: string, initialState: T) {
         this.store = store;
         this.initialState = initialState;
         this.state = atom(this.initialState);
@@ -37,11 +37,14 @@ export class StateController<T extends Record<string, any>> {
     }
 
     useGenericHooks(keys: (keyof T)[]): Partial<T> {
+        const atoms = keys.map(key => this.getFocusItem(key));
+        const values = atoms.map(atom => useAtom(atom)[0]);
+
         const keysVal: Partial<T> = {};
-        keys.forEach(key => {
-            const [value] = useAtom(this.getFocusItem(key));
-            (keysVal as T)[key] = value; // Type assertion to tell TypeScript this is valid
+        keys.forEach((key, index) => {
+            keysVal[key] = values[index];
         });
+
         return keysVal;
     }
 
@@ -175,7 +178,7 @@ export class StateController<T extends Record<string, any>> {
      * @param listener Callback function that receives the changed keys
      * @returns Unsubscribe function to remove all listeners
      */
-    subscribeToKeys(keys: (keyof T)[], listener: (changedKeys: Partial<T>, allKeys: Partial<T> ) => void): () => void {
+    subscribeToKeys(keys: (keyof T)[], listener: (changedKeys: Partial<T>, allKeys: Partial<T>) => void): () => void {
         // Validate that this method is being called from a method that starts with 'on'
         const stack = new Error().stack;
         if (stack) {
