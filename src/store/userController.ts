@@ -8,7 +8,7 @@ type UserState = {
 
 export class UserController extends StateController<UserState> {
     constructor() {
-        super({
+        super('UserController', {
             name: '',
             role: 'user',
             lastAction: ''

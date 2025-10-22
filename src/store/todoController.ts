@@ -15,7 +15,7 @@ type TodoState = {
 
 export class TodoController extends StateController<TodoState> {
     constructor() {
-        super({
+        super('TodoController', {
             todos: [],
             filter: 'all',
             searchQuery: ''

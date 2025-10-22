@@ -14,10 +14,11 @@ export class StateController<T extends Record<string, any>> {
     initialState: T;
     private listeners: Map<keyof T, Set<StateChangeListener<T, any>>>;
 
-    constructor(initialState: T) {
+    constructor(name: string, initialState: T, hydrationConfig?: HydrationConfig<T>) {
         this.store = store;
         this.initialState = initialState;
         this.state = atom(this.initialState);
+        this.state.debugLabel = name;
         this.focusState = {} as { [K in keyof T]: WritableAtom<T[K], [T[K]], void> };
         this.listeners = new Map();
         Object.keys(initialState).forEach(key => {
@@ -31,13 +32,13 @@ export class StateController<T extends Record<string, any>> {
                 (key as any).split('.').reduce((acc: any, part: any) => acc.prop(part), optic)
             ) as WritableAtom<T[typeof key], [T[typeof key]], void>;
         }
+        this.focusState[key].debugPrivate = true
         return this.focusState[key];
     }
 
     useGenericHooks(keys: (keyof T)[]): Partial<T> {
         const keysVal: Partial<T> = {};
         keys.forEach(key => {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
             const [value] = useAtom(this.getFocusItem(key));
             (keysVal as T)[key] = value; // Type assertion to tell TypeScript this is valid
         });
