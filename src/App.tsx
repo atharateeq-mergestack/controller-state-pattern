@@ -1,10 +1,9 @@
 import { TodoList } from "./features/todo/TodoList";
 import { TodoStats } from "./features/todo/TodoStats";
-import { StorageController } from "./store/StorageController";
+import { appStorage } from "./store/appStroageController";
 
 function App() {
-  const storageController = StorageController.getInstance();
-  const { theme } = storageController.useStorage(['theme']);
+  const { theme } = appStorage.useState(['theme']);
 
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'bg-red-300' : 'bg-red-100'}`}>
@@ -15,7 +14,7 @@ function App() {
               State Controller Pattern Demo
             </h1>
             <button
-              onClick={() => storageController.toggleTheme()}
+              onClick={() => appStorage.toggleTheme()}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${theme === 'dark'
                 ? 'bg-blue-600 hover:bg-blue-700 text-white'
                 : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
