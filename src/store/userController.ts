@@ -1,10 +1,11 @@
 import { StateController } from './stateController';
+import { StateObject } from '../types';
 
 type UserState = {
     name: string;
     role: 'admin' | 'user';
     lastAction: string;
-};
+} & StateObject;
 
 export class UserController extends StateController<UserState> {
     constructor() {

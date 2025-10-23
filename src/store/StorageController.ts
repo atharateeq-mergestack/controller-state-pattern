@@ -1,21 +1,30 @@
 import { useAtom, type WritableAtom } from 'jotai';
 import { atomWithStorage, createJSONStorage, RESET } from 'jotai/utils';
 import { store } from '../jotai-provider';
-
-// Type definition for state change listeners (same as in StateController)
-type StateChangeListener<T, K extends keyof T> = (newValue: T[K], oldValue: T[K] | undefined) => void;
+import { StateObject, StateChangeListener } from '../types';
 
 /**
  * Persistent Storage Controller (Same API as StateController, but with localStorage)
  */
-export class StorageController<T extends Record<string, any>> {
-    store;
+export class StorageController<T extends StateObject> {
+    /** Jotai store instance for state management */
+    store: typeof store;
+    /** Prefix for localStorage keys to avoid conflicts */
     storagePrefix = '';
-    protected atoms: Record<string, WritableAtom<any, [any | typeof RESET], void>> = {};
+    /** Internal atoms map for each state key */
+    protected atoms: Record<string, WritableAtom<unknown, [unknown | typeof RESET], void>> = {};
+    /** Initial state values for reset functionality */
     protected initialState: T;
+    /** JSON storage instance for localStorage persistence */
     protected storage = createJSONStorage(() => localStorage);
-    private listeners: Map<keyof T, Set<StateChangeListener<T, any>>> = new Map();
+    /** Map of listeners for state change notifications */
+    private listeners: Map<keyof T, Set<StateChangeListener<T, keyof T>>> = new Map();
 
+    /**
+     * Creates a new StorageController instance
+     * @param initialState - Initial state values for all keys
+     * @param prefix - Optional prefix for localStorage keys
+     */
     constructor(initialState: T, prefix?: string) {
         this.store = store;
         this.initialState = initialState;
@@ -36,7 +45,7 @@ export class StorageController<T extends Record<string, any>> {
             );
             this.atoms[key as string].debugLabel = `${String(key)}`;
         }
-        return this.atoms[key as string];
+        return this.atoms[key as string] as WritableAtom<T[K], [T[K] | typeof RESET], void>;
     }
 
 
@@ -83,7 +92,7 @@ export class StorageController<T extends Record<string, any>> {
     setState(newState: Partial<T>) {
         const prevState = this.getAllValues();
         Object.entries(newState).forEach(([key, val]) => {
-            this.store.set(this.getAtom(key as keyof T), val);
+            this.store.set(this.getAtom(key as keyof T), val as T[keyof T]);
         });
         this.notifyListeners(newState, prevState);
     }
@@ -95,7 +104,7 @@ export class StorageController<T extends Record<string, any>> {
         const prevState = this.getAllValues();
         const updatedState = { ...prevState, ...newState };
         Object.entries(updatedState).forEach(([key, val]) => {
-            this.store.set(this.getAtom(key as keyof T), val);
+            this.store.set(this.getAtom(key as keyof T), val as T[keyof T]);
         });
         this.notifyListeners(newState, prevState);
     }
@@ -142,12 +151,12 @@ export class StorageController<T extends Record<string, any>> {
             this.listeners.set(key, new Set());
         }
         const keyListeners = this.listeners.get(key)!;
-        keyListeners.add(listener as StateChangeListener<T, any>);
+        keyListeners.add(listener as StateChangeListener<T, keyof T>);
 
         return () => {
             const listeners = this.listeners.get(key);
             if (listeners) {
-                listeners.delete(listener as StateChangeListener<T, any>);
+                listeners.delete(listener as StateChangeListener<T, keyof T>);
                 if (listeners.size === 0) {
                     this.listeners.delete(key);
                 }

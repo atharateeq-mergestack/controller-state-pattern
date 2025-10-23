@@ -1,6 +1,7 @@
 import { StorageController } from "./StorageController";
+import { StateObject } from '../types';
 
-export interface AppStorage {
+export interface AppStorage extends StateObject {
     theme: 'light' | 'dark';
     language: 'en' | 'fr';
     sidebarOpen: boolean;

@@ -2,17 +2,15 @@ import { focusAtom } from 'jotai-optics';
 import { useAtom, atom, type WritableAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { store } from '../jotai-provider';
-
-// Type definition for state change listeners
-type StateChangeListener<T, K extends keyof T> = (newValue: T[K], oldValue: T[K] | undefined) => void;
+import { StateObject, StateChangeListener } from '../types';
 
 // Base Class for Jotai State Controller
-export class StateController<T extends Record<string, any>> {
+export class StateController<T extends StateObject> {
     store;
     state: WritableAtom<T, [T], void>;
     focusState: { [K in keyof T]: WritableAtom<T[K], [T[K]], void> };
     initialState: T;
-    private listeners: Map<keyof T, Set<StateChangeListener<T, any>>>;
+    private listeners: Map<keyof T, Set<StateChangeListener<T, keyof T>>>;
 
     constructor(name: string, initialState: T) {
         this.store = store;
@@ -29,7 +27,8 @@ export class StateController<T extends Record<string, any>> {
     getFocusItem(key: keyof T) {
         if (!this.focusState[key]) {
             this.focusState[key] = focusAtom(this.state, optic =>
-                (key as any).split('.').reduce((acc: any, part: any) => acc.prop(part), optic)
+                // @ts-expect-error - Complex optics types from jotai-optics
+                (key as string).split('.').reduce((acc: unknown, part: string) => (acc as Record<string, unknown>).prop(part), optic)
             ) as WritableAtom<T[typeof key], [T[typeof key]], void>;
         }
         this.focusState[key].debugPrivate = true
@@ -55,16 +54,17 @@ export class StateController<T extends Record<string, any>> {
     useScopeState(key: keyof T) {
         if (!this.focusState[key])
             this.focusState[key] = focusAtom(this.state, optic =>
-                (key as any).split('.').reduce((acc: any, part: any) => acc.prop(part), optic)
+                // @ts-expect-error - Complex optics types from jotai-optics
+                (key as string).split('.').reduce((acc: unknown, part: string) => (acc as Record<string, unknown>).prop(part), optic)
             ) as WritableAtom<T[typeof key], [T[typeof key]], void>;
         return () => useAtom(this.focusState[key]);
     }
 
     useHydration(state: T) {
-        const hydratedStates: any[] = [];
+        const hydratedStates: [WritableAtom<T[string], [T[string]], void>, T[string]][] = [];
         Object.keys(state).forEach(key => {
             this.getFocusItem(key);
-            hydratedStates.push([this.focusState[key], state[key]]);
+            hydratedStates.push([this.focusState[key], state[key] as T[string]]);
         });
         return () => useHydrateAtoms(hydratedStates);
     }
@@ -112,7 +112,7 @@ export class StateController<T extends Record<string, any>> {
 
     getValue = <K extends keyof T>(key: K): T[K] => {
         try {
-            return this.focusState[key] ? store.get(this.focusState[key]) : (null as any);
+            return this.focusState[key] ? store.get(this.focusState[key]) : (null as T[K]);
         } catch {
             throw Error(`Key: ${key as string} does not exist in initial State of`);
         }
@@ -156,13 +156,13 @@ export class StateController<T extends Record<string, any>> {
         }
 
         const keyListeners = this.listeners.get(key)!;
-        keyListeners.add(listener as StateChangeListener<T, any>);
+        keyListeners.add(listener as StateChangeListener<T, keyof T>);
 
         // Return unsubscribe function
         return () => {
             const listeners = this.listeners.get(key);
             if (listeners) {
-                listeners.delete(listener as StateChangeListener<T, any>);
+                listeners.delete(listener as StateChangeListener<T, keyof T>);
                 if (listeners.size === 0) {
                     this.listeners.delete(key);
                 }
@@ -259,11 +259,11 @@ export class StateController<T extends Record<string, any>> {
      * This ensures that 'this' always refers to the controller instance
      * when methods are passed as callbacks or used in React components
      */
-    bindMethods(instance: any) {
-        let proto = Object.getPrototypeOf(instance);
+    bindMethods(instance: StateObject | object) {
+        const proto = Object.getPrototypeOf(instance);
         // Get all properties including inherited ones
         const propertyNames = Object.getOwnPropertyNames(proto).filter(
-            prop => typeof instance[prop] === 'function' && prop !== 'constructor'
+            prop => typeof (instance as StateObject)[prop] === 'function' && prop !== 'constructor'
         );
         // Iterate through all properties
         propertyNames.forEach(name => {
@@ -272,7 +272,7 @@ export class StateController<T extends Record<string, any>> {
             // Only bind if it's a method (function) and not the constructor
             if (typeof property === 'function' && name !== 'constructor') {
                 // Bind the method to this instance
-                (this as any)[name] = property.bind(this);
+                (this as StateObject)[name] = property.bind(this);
             }
         });
     }
@@ -287,17 +287,17 @@ export class StateController<T extends Record<string, any>> {
      * Automatically subscribes all methods that start with 'on'
      * This eliminates the need to manually call subscription methods in the constructor
      */
-    autoSubscribeOnMethods(instance: any) {
+    autoSubscribeOnMethods(instance: StateObject | object) {
         // Get all properties including inherited ones
         const propertyNames = Object.getOwnPropertyNames(instance).filter(
-            prop => typeof instance[prop] === 'function' && prop !== 'constructor'
+            prop => typeof (instance as StateObject)[prop] === 'function' && prop !== 'constructor'
         );
         // Find all methods that start with 'on'
         propertyNames.forEach(name => {
             if (name.startsWith('on') && typeof this[name as keyof this] === 'function') {
                 try {
                     // Call the method and store the unsubscribe function if returned
-                    const unsubscribe = (this[name as keyof this] as Function)();
+                    const unsubscribe = (this[name as keyof this] as () => (() => void) | void)();
                     if (typeof unsubscribe === 'function') {
                         this.activeSubscriptions.set(name, unsubscribe);
                     }

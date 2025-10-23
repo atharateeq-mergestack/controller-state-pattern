@@ -1,5 +1,6 @@
 import React from 'react';
 import { StateController } from './stateController';
+import { StateObject } from '../types';
 
 export type Todo = {
     id: string;
@@ -11,7 +12,7 @@ type TodoState = {
     todos: Todo[];
     filter: 'all' | 'active' | 'completed';
     searchQuery: string;
-};
+} & StateObject;
 
 export class TodoController extends StateController<TodoState> {
     constructor() {
