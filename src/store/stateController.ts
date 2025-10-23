@@ -57,8 +57,7 @@ export class StateController<T extends Record<string, any>> {
             this.focusState[key] = focusAtom(this.state, optic =>
                 (key as any).split('.').reduce((acc: any, part: any) => acc.prop(part), optic)
             ) as WritableAtom<T[typeof key], [T[typeof key]], void>;
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        return useAtom(this.focusState[key]);
+        return () => useAtom(this.focusState[key]);
     }
 
     useHydration(state: T) {
@@ -67,8 +66,7 @@ export class StateController<T extends Record<string, any>> {
             this.getFocusItem(key);
             hydratedStates.push([this.focusState[key], state[key]]);
         });
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        useHydrateAtoms(hydratedStates);
+        return () => useHydrateAtoms(hydratedStates);
     }
 
     setState(newState: Partial<T>) {

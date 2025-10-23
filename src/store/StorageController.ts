@@ -39,12 +39,12 @@ export class StorageController<T extends Record<string, any>> {
         return this.atoms[key as string];
     }
 
+
     /**
-     * Hook - same as useScopeState in StateController
+     * Return a hook function instead of calling it directly
      */
     useScopeState<K extends keyof T>(key: K) {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        return useAtom(this.getAtom(key));
+        return () => useAtom(this.getAtom(key));
     }
 
     /**
