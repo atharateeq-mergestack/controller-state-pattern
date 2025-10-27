@@ -1,0 +1,68 @@
+{
+  "name": "jotai-controller",
+  "version": "1.0.9",
+  "type": "module",
+  "description": "A powerful state management library built on top of Jotai with controller pattern for React applications",
+  "main": "lib/index.js",
+  "module": "lib/index.esm.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jotai",
+    "state-management",
+    "react",
+    "controller",
+    "typescript",
+    "localStorage",
+    "persistent-state"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/jotai-controller.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/jotai-controller/issues"
+  },
+  "homepage": "https://github.com/yourusername/jotai-controller#readme",
+  "peerDependencies": {
+    "jotai": ">=2.0.0",
+    "react": ">=16.8.0"
+  },
+  "dependencies": {
+    "jotai": ">=2.0.0",
+    "jotai-optics": "^0.4.0",
+    "optics-ts": "^2.4.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^12.1.1",
+    "@types/react": "^19.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.24.1",
+    "@typescript-eslint/parser": "^8.24.1",
+    "eslint": "^9.21.0",
+    "rollup": "^4.28.1",
+    "rollup-plugin-dts": "^6.1.1",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "tslib": "^2.8.1",
+    "typescript": "~5.7.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
