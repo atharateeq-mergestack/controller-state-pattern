@@ -29,16 +29,18 @@ export class StorageController<T extends StateObject> {
     /** Map of listeners for state change notifications */
     private listeners: Map<keyof T, Set<StateChangeListener<T, keyof T>>> = new Map();
 
+    private isClient: boolean = false;  // Track if we're on the client
+
     /**
      * Creates a new StorageController instance
      * @param initialState - Initial state values for all keys
      * @param options - Optional configuration: prefix, storageType, customStore, cookieOptions
      */
     constructor(
-        initialState: T, 
-        options?: { 
-            prefix?: string; 
-            storageType?: StorageType; 
+        initialState: T,
+        options?: {
+            prefix?: string;
+            storageType?: StorageType;
             customStore?: ReturnType<typeof createStore>;
             cookieOptions?: Cookies.CookieAttributes;
         }
@@ -48,12 +50,16 @@ export class StorageController<T extends StateObject> {
         this.storagePrefix = options?.prefix ?? this.storagePrefix;
         this.storageType = options?.storageType ?? 'localStorage';
 
-        // Create the appropriate storage adapter
-        if (this.storageType === 'cookie') {
-            this.storage = this.createCookieStorage(options?.cookieOptions);
-        } else {
-            const storage = this.storageType === 'sessionStorage' ? sessionStorage : localStorage;
-            this.storage = createJSONStorage(() => storage);
+        // Check if we're on the client-side
+        if (typeof window !== 'undefined') {
+            this.isClient = true;
+            // Create the appropriate storage adapter only if on the client
+            if (this.storageType === 'cookie') {
+                this.storage = this.createCookieStorage(options?.cookieOptions);
+            } else {
+                const storage = this.storageType === 'sessionStorage' ? sessionStorage : localStorage;
+                this.storage = createJSONStorage(() => storage);
+            }
         }
     }
 
@@ -86,7 +92,7 @@ export class StorageController<T extends StateObject> {
                 storageKey,
                 this.initialState[key],
                 this.storage,
-                { getOnInit: true }
+                { getOnInit: this.isClient }  // Initialize only if on the client
             );
             this.atoms[key as string].debugLabel = `${String(key)}`;
         }
