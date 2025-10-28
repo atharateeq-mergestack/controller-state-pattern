@@ -13,6 +13,10 @@ export class AppStorageController extends StorageController<AppStorage> {
             theme: 'light',
             language: 'en',
             sidebarOpen: false,
+        }, {
+            // Default: localStorage
+            // Can also use 'sessionStorage' or 'cookie' for different storage backends
+            storageType: 'cookie'
         });
     }
 
