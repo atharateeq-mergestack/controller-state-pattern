@@ -6,7 +6,7 @@ A powerful state management library built on top of Jotai with controller patter
 
 - 🎯 **Controller Pattern**: Clean separation of concerns with controller-based state management
 - 🔄 **Automatic Subscriptions**: Auto-subscribe to state changes with methods starting with 'on'
-- 💾 **Persistent Storage**: Built-in localStorage support with `StorageController`
+- 💾 **Multi-Storage Support**: Built-in support for localStorage, sessionStorage, and cookies with `StorageController`
 - 🎨 **TypeScript Support**: Full TypeScript support with excellent type inference
 - ⚡ **Jotai Integration**: Built on top of Jotai for optimal performance
 - 🔧 **Flexible API**: Use hooks, direct state access, or subscription patterns
@@ -15,12 +15,14 @@ A powerful state management library built on top of Jotai with controller patter
 ## Installation
 
 ```bash
-npm install jotai-controller
+npm install jotai-controller js-cookie
 # or
-yarn add jotai-controller
+yarn add jotai-controller js-cookie
 # or
-pnpm add jotai-controller
+pnpm add jotai-controller js-cookie
 ```
+
+**Note**: `js-cookie` is required for cookie storage support. It's automatically installed with the package.
 
 ## Setup
 
@@ -149,8 +151,10 @@ function App() {
 
 ### Persistent Storage with StorageController
 
+`StorageController` supports multiple storage backends: `localStorage`, `sessionStorage`, and `cookies`.
+
 ```typescript
-import { StorageController } from 'jotai-controller';
+import { StorageController, StorageType } from 'jotai-controller';
 
 interface SettingsState {
   theme: 'light' | 'dark';
@@ -158,6 +162,7 @@ interface SettingsState {
   notifications: boolean;
 }
 
+// Using localStorage (default)
 class SettingsController extends StorageController<SettingsState> {
   constructor() {
     super({
@@ -176,6 +181,38 @@ class SettingsController extends StorageController<SettingsState> {
 
   toggleNotifications() {
     this.toggle('notifications'); // Built-in toggle method for booleans
+  }
+}
+
+// Using sessionStorage
+class SessionSettingsController extends StorageController<SettingsState> {
+  constructor() {
+    super({
+      theme: 'light',
+      language: 'en',
+      notifications: true
+    }, {
+      storageType: 'sessionStorage'
+    });
+  }
+}
+
+// Using cookies
+class CookieSettingsController extends StorageController<SettingsState> {
+  constructor() {
+    super({
+      theme: 'light',
+      language: 'en',
+      notifications: true
+    }, {
+      storageType: 'cookie',
+      // Optional: configure cookie options
+      cookieOptions: {
+        expires: 7, // 7 days
+        secure: true,
+        sameSite: 'strict'
+      }
+    });
   }
 }
 
@@ -261,17 +298,112 @@ constructor(name: string, initialState: T, customStore?: ReturnType<typeof creat
 
 ### StorageController
 
-Extends StateController with localStorage persistence.
+Extends StateController with persistence support for localStorage, sessionStorage, and cookies.
 
 #### Constructor
 ```typescript
-constructor(initialState: T, prefix?: string, customStore?: ReturnType<typeof createStore>)
+constructor(
+  initialState: T, 
+  options?: {
+    prefix?: string;
+    storageType?: StorageType; // 'localStorage' | 'sessionStorage' | 'cookie'
+    customStore?: ReturnType<typeof createStore>;
+    cookieOptions?: Cookies.CookieAttributes; // Only used when storageType is 'cookie'
+  }
+)
 ```
+
+#### Parameters
+
+- `initialState`: Initial state values for all keys
+- `options.prefix`: Optional prefix for storage keys to avoid conflicts
+- `options.storageType`: Storage backend to use (`'localStorage'`, `'sessionStorage'`, or `'cookie'`). Defaults to `'localStorage'`
+- `options.customStore`: Optional custom Jotai store instance
+- `options.cookieOptions`: Optional cookie configuration (only used with `storageType: 'cookie'`)
+
+#### Storage Types
+
+- **localStorage**: Persists across browser sessions, shared across tabs
+- **sessionStorage**: Persists only for the current browser session, shared across tabs
+- **cookies**: Server-readable persistence, can be configured with expiration, secure, sameSite, etc.
 
 #### Additional Methods
 
 - `getAllValues(): T` - Get all current state values
 - `toggle<K extends keyof T>(key: K): void` - Toggle boolean values
+
+### Storage Type Examples
+
+#### Example: User Preferences with localStorage
+Persist user preferences across browser sessions:
+
+```typescript
+interface UserPreferences {
+  theme: 'light' | 'dark';
+  fontSize: number;
+  language: string;
+}
+
+class UserPreferencesController extends StorageController<UserPreferences> {
+  constructor() {
+    super({
+      theme: 'light',
+      fontSize: 14,
+      language: 'en'
+    }, {
+      prefix: 'user_prefs_'
+    });
+  }
+}
+```
+
+#### Example: Shopping Cart with sessionStorage
+Store cart data that persists during the session but clears when the browser closes:
+
+```typescript
+interface CartState {
+  items: CartItem[];
+  total: number;
+}
+
+class CartController extends StorageController<CartState> {
+  constructor() {
+    super({
+      items: [],
+      total: 0
+    }, {
+      storageType: 'sessionStorage',
+      prefix: 'cart_'
+    });
+  }
+}
+```
+
+#### Example: Authentication Token with Cookies
+Store authentication tokens that can be read by the server:
+
+```typescript
+interface AuthState {
+  token: string;
+  refreshToken: string;
+}
+
+class AuthController extends StorageController<AuthState> {
+  constructor() {
+    super({
+      token: '',
+      refreshToken: ''
+    }, {
+      storageType: 'cookie',
+      cookieOptions: {
+        expires: 7, // 7 days
+        secure: true, // HTTPS only
+        sameSite: 'strict'
+      }
+    });
+  }
+}
+```
 
 ## Advanced Usage
 
@@ -286,8 +418,10 @@ const customStore = createStore();
 
 // Use with controllers
 const userController = new StateController('user', initialState, customStore);
-const settingsController = new StorageController(settingsState, "", customStore);
-```
+const settingsController = new StorageController(settingsState, { 
+  prefix: '', 
+  customStore 
+});
 
 ### Manual Subscription Management
 

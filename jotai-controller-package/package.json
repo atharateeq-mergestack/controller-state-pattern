@@ -1,6 +1,6 @@
 {
   "name": "jotai-controller",
-  "version": "1.0.9",
+  "version": "1.0.11",
   "type": "module",
   "description": "A powerful state management library built on top of Jotai with controller pattern for React applications",
   "main": "lib/index.js",
@@ -27,6 +27,8 @@
     "controller",
     "typescript",
     "localStorage",
+    "sessionStorage",
+    "cookies",
     "persistent-state"
   ],
   "author": "Your Name",
@@ -46,12 +48,14 @@
   "dependencies": {
     "jotai": ">=2.0.0",
     "jotai-optics": "^0.4.0",
+    "js-cookie": "^3.0.5",
     "optics-ts": "^2.4.1"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^12.1.1",
+    "@types/js-cookie": "^3.0.6",
     "@types/react": "^19.0.10",
     "@typescript-eslint/eslint-plugin": "^8.24.1",
     "@typescript-eslint/parser": "^8.24.1",

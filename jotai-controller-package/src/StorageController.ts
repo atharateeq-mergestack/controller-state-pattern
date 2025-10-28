@@ -1,36 +1,79 @@
 import { useAtom, type WritableAtom } from 'jotai';
 import { atomWithStorage, createJSONStorage, RESET } from 'jotai/utils';
 import { createStore } from 'jotai';
+import Cookies from 'js-cookie';
 import { StateObject, StateChangeListener } from './types';
 import { store } from './Provider';
 
 /**
- * Persistent Storage Controller (Same API as StateController, but with localStorage)
+ * Storage type options
+ */
+export type StorageType = 'localStorage' | 'sessionStorage' | 'cookie';
+
+/**
+ * Persistent Storage Controller (Same API as StateController, but with localStorage/sessionStorage/cookies)
  */
 export class StorageController<T extends StateObject> {
     /** Jotai store instance for state management */
     store: ReturnType<typeof createStore>;
-    /** Prefix for localStorage keys to avoid conflicts */
+    /** Prefix for storage keys to avoid conflicts */
     storagePrefix = '';
     /** Internal atoms map for each state key */
     protected atoms: Record<string, WritableAtom<unknown, [unknown | typeof RESET], void>> = {};
     /** Initial state values for reset functionality */
     protected initialState: T;
-    /** JSON storage instance for localStorage persistence */
-    protected storage = createJSONStorage(() => localStorage);
+    /** JSON storage instance for persistence */
+    protected storage;
+    /** Storage type being used */
+    protected storageType: StorageType;
     /** Map of listeners for state change notifications */
     private listeners: Map<keyof T, Set<StateChangeListener<T, keyof T>>> = new Map();
 
     /**
      * Creates a new StorageController instance
      * @param initialState - Initial state values for all keys
-     * @param prefix - Optional prefix for localStorage keys
-     * @param customStore - Optional custom Jotai store instance
+     * @param options - Optional configuration: prefix, storageType, customStore, cookieOptions
      */
-    constructor(initialState: T, prefix?: string, customStore?: ReturnType<typeof createStore>) {
-        this.store = customStore || store;
+    constructor(
+        initialState: T, 
+        options?: { 
+            prefix?: string; 
+            storageType?: StorageType; 
+            customStore?: ReturnType<typeof createStore>;
+            cookieOptions?: Cookies.CookieAttributes;
+        }
+    ) {
+        this.store = options?.customStore || store;
         this.initialState = initialState;
-        this.storagePrefix = prefix ?? this.storagePrefix;
+        this.storagePrefix = options?.prefix ?? this.storagePrefix;
+        this.storageType = options?.storageType ?? 'localStorage';
+
+        // Create the appropriate storage adapter
+        if (this.storageType === 'cookie') {
+            this.storage = this.createCookieStorage(options?.cookieOptions);
+        } else {
+            const storage = this.storageType === 'sessionStorage' ? sessionStorage : localStorage;
+            this.storage = createJSONStorage(() => storage);
+        }
+    }
+
+    /**
+     * Creates a cookie storage adapter compatible with jotai's createJSONStorage
+     */
+    private createCookieStorage(cookieOptions?: Cookies.CookieAttributes) {
+        return createJSONStorage(() => ({
+            getItem: (key: string) => {
+                const value = Cookies.get(key);
+                return value ?? null;
+            },
+            setItem: (key: string, value: unknown) => {
+                const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+                Cookies.set(key, stringValue, cookieOptions);
+            },
+            removeItem: (key: string) => {
+                Cookies.remove(key);
+            },
+        }));
     }
 
     /**
