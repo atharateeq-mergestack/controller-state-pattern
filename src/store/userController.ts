@@ -1,4 +1,4 @@
-import { StateController } from './stateController';
+import { StateController } from './StateController';
 import { StateObject } from '../types';
 
 type UserState = {

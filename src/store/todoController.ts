@@ -1,5 +1,5 @@
 import React from 'react';
-import { StateController } from './stateController';
+import { StateController } from './StateController';
 import { StateObject } from '../types';
 
 export type Todo = {

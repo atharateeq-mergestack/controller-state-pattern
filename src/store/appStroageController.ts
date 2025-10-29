@@ -16,7 +16,7 @@ export class AppStorageController extends StorageController<AppStorage> {
         }, {
             // Default: localStorage
             // Can also use 'sessionStorage' or 'cookie' for different storage backends
-            storageType: 'cookie'
+            storageType: 'localStorage'
         });
     }
 
