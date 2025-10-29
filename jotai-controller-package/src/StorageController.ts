@@ -2,8 +2,8 @@ import { useAtom, type WritableAtom } from 'jotai';
 import { atomWithStorage, createJSONStorage, RESET } from 'jotai/utils';
 import { createStore } from 'jotai';
 import Cookies from 'js-cookie';
-import { StateObject, StateChangeListener } from './types';
-import { store } from './Provider';
+import { StateObject } from './types';
+import { BaseController } from './BaseController';
 
 /**
  * Storage type options
@@ -13,22 +13,15 @@ export type StorageType = 'localStorage' | 'sessionStorage' | 'cookie';
 /**
  * Persistent Storage Controller (Same API as StateController, but with localStorage/sessionStorage/cookies)
  */
-export class StorageController<T extends StateObject> {
-    /** Jotai store instance for state management */
-    store: ReturnType<typeof createStore>;
+export class StorageController<T extends StateObject> extends BaseController<T> {
     /** Prefix for storage keys to avoid conflicts */
     storagePrefix = '';
     /** Internal atoms map for each state key */
     protected atoms: Record<string, WritableAtom<unknown, [unknown | typeof RESET], void>> = {};
-    /** Initial state values for reset functionality */
-    protected initialState: T;
     /** JSON storage instance for persistence */
     protected storage;
     /** Storage type being used */
     protected storageType: StorageType;
-    /** Map of listeners for state change notifications */
-    private listeners: Map<keyof T, Set<StateChangeListener<T, keyof T>>> = new Map();
-
     private isClient: boolean = false;  // Track if we're on the client
 
     /**
@@ -45,8 +38,7 @@ export class StorageController<T extends StateObject> {
             cookieOptions?: Cookies.CookieAttributes;
         }
     ) {
-        this.store = options?.customStore || store;
-        this.initialState = initialState;
+        super(initialState, options?.customStore);
         this.storagePrefix = options?.prefix ?? this.storagePrefix;
         this.storageType = options?.storageType ?? 'localStorage';
 
@@ -119,49 +111,10 @@ export class StorageController<T extends StateObject> {
         return values;
     }
 
-    /**
-     * Get current values for multiple keys (same as getValues)
-     */
-    getValues(keys: (keyof T)[]): Partial<T> {
-        const values: Partial<T> = {};
-        keys.forEach(key => {
-            values[key] = this.store.get(this.getAtom(key));
-        });
-        return values;
-    }
+
 
     /**
-     * Get a single key (same as getValue)
-     */
-    getValue<K extends keyof T>(key: K): T[K] {
-        return this.store.get(this.getAtom(key));
-    }
-
-    /**
-     * Set multiple values (same as setState)
-     */
-    setState(newState: Partial<T>) {
-        const prevState = this.getAllValues();
-        Object.entries(newState).forEach(([key, val]) => {
-            this.store.set(this.getAtom(key as keyof T), val as T[keyof T]);
-        });
-        this.notifyListeners(newState, prevState);
-    }
-
-    /**
-     * Update state (merge) - same as updateState
-     */
-    updateState(newState: Partial<T>) {
-        const prevState = this.getAllValues();
-        const updatedState = { ...prevState, ...newState };
-        Object.entries(updatedState).forEach(([key, val]) => {
-            this.store.set(this.getAtom(key as keyof T), val as T[keyof T]);
-        });
-        this.notifyListeners(newState, prevState);
-    }
-
-    /**
-     * Reset a single state (same as resetState)
+     * Reset a single state (override to use RESET)
      */
     resetState<K extends keyof T>(key: K) {
         const prevValue = this.getValue(key);
@@ -169,24 +122,16 @@ export class StorageController<T extends StateObject> {
         this.notifyKeyListeners(key, this.initialState[key], prevValue);
     }
 
-    /**
-     * Reset multiple states (same as resetStates)
-     */
-    resetStates(keys: (keyof T)[]) {
-        keys.forEach(key => this.resetState(key));
+    // Implement abstract methods from BaseController
+    protected getKeyValue<K extends keyof T>(key: K): T[K] {
+        return this.store.get(this.getAtom(key));
     }
 
-    /**
-     * Reset all (same as resetAll)
-     */
-    resetAll() {
-        Object.keys(this.initialState).forEach(key => this.resetState(key as keyof T));
+    protected setKeyValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.store.set(this.getAtom(key), value);
     }
 
-    /**
-     * Get all current values (same as getValues but all)
-     */
-    getAllValues(): T {
+    protected getAllCurrentValues(): T {
         const result = {} as T;
         Object.keys(this.initialState).forEach(key => {
             result[key as keyof T] = this.getValue(key as keyof T);
@@ -195,60 +140,12 @@ export class StorageController<T extends StateObject> {
     }
 
     /**
-     * Subscribe to a key change (same signature)
+     * Get all current values (same as getValues but all)
      */
-    subscribe<K extends keyof T>(key: K, listener: StateChangeListener<T, K>): () => void {
-        if (!this.listeners.has(key)) {
-            this.listeners.set(key, new Set());
-        }
-        const keyListeners = this.listeners.get(key)!;
-        keyListeners.add(listener as StateChangeListener<T, keyof T>);
-
-        return () => {
-            const listeners = this.listeners.get(key);
-            if (listeners) {
-                listeners.delete(listener as StateChangeListener<T, keyof T>);
-                if (listeners.size === 0) {
-                    this.listeners.delete(key);
-                }
-            }
-        };
+    getAllValues(): T {
+        return this.getAllCurrentValues();
     }
 
-    /**
-     * Notify listeners for all updated keys (same logic)
-     */
-    private notifyListeners(newState: Partial<T>, prevState: T): void {
-        Object.keys(newState).forEach(key => {
-            const typedKey = key as keyof T;
-            this.notifyKeyListeners(typedKey, newState[typedKey] as T[typeof typedKey], prevState[typedKey]);
-        });
-    }
-
-    /**
-     * Notify listeners for one key (same logic)
-     */
-    private notifyKeyListeners<K extends keyof T>(key: K, newValue: T[K], oldValue: T[K]): void {
-        const keyListeners = this.listeners.get(key);
-        if (keyListeners && keyListeners.size > 0) {
-            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-                keyListeners.forEach(listener => {
-                    try {
-                        listener(newValue, oldValue);
-                    } catch (err) {
-                        console.error(`Error in storage listener for ${String(key)}:`, err);
-                    }
-                });
-            }
-        }
-    }
-
-    /**
-     * Clear all listeners (same as clearAllListeners)
-     */
-    clearAllListeners() {
-        this.listeners.clear();
-    }
 
     /**
      * Utility: Toggle boolean key (optional)

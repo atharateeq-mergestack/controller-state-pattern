@@ -3,23 +3,18 @@ import { useAtom, atom, type WritableAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { createStore } from 'jotai';
 import { StateObject, StateChangeListener } from './types';
-import { store } from './Provider';
+import { BaseController } from './BaseController';
 
 // Base Class for Jotai State Controller
-export class StateController<T extends StateObject> {
-    store;
+export class StateController<T extends StateObject> extends BaseController<T> {
     state: WritableAtom<T, [T], void>;
     focusState: { [K in keyof T]: WritableAtom<T[K], [T[K]], void> };
-    initialState: T;
-    private listeners: Map<keyof T, Set<StateChangeListener<T, keyof T>>>;
 
     constructor(name: string, initialState: T, customStore?: ReturnType<typeof createStore>) {
-        this.store = customStore || store
-        this.initialState = initialState;
+        super(initialState, customStore);
         this.state = atom(this.initialState);
         this.state.debugLabel = name;
         this.focusState = {} as { [K in keyof T]: WritableAtom<T[K], [T[K]], void> };
-        this.listeners = new Map();
         Object.keys(initialState).forEach(key => {
             this.getFocusItem(key);
         });
@@ -103,32 +98,6 @@ export class StateController<T extends StateObject> {
         this.notifyListeners(newState, prevState);
     }
 
-    getValues(keys: (keyof T)[]) {
-        const returnValues = {} as Partial<T>;
-        keys.forEach(key => {
-            returnValues[key] = this.store.get(this.focusState[key]);
-        });
-        return returnValues;
-    }
-
-    getValue = <K extends keyof T>(key: K): T[K] => {
-        try {
-            return this.focusState[key] ? this.store.get(this.focusState[key]) : (null as T[K]);
-        } catch {
-            throw Error(`Key: ${key as string} does not exist in initial State of`);
-        }
-    };
-
-    resetAll() {
-        this.store.set(this.state, this.initialState);
-    }
-
-    resetStates(keys: (keyof T)[]) {
-        keys.forEach(key => {
-            this.store.set(this.focusState[key], this.initialState[key]);
-        });
-    }
-
     resetState(key: keyof T) {
         const prevValue = this.store.get(this.focusState[key]);
         this.store.set(this.focusState[key], this.initialState[key]);
@@ -137,8 +106,26 @@ export class StateController<T extends StateObject> {
         this.notifyKeyListeners(key, this.initialState[key], prevValue);
     }
 
+    // Implement abstract methods from BaseController
+    protected getKeyValue<K extends keyof T>(key: K): T[K] {
+        try {
+            return this.focusState[key] ? this.store.get(this.focusState[key]) : (null as T[K]);
+        } catch {
+            throw Error(`Key: ${key as string} does not exist in initial State of`);
+        }
+    }
+
+    protected setKeyValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.getFocusItem(key);
+        this.store.set(this.focusState[key], value);
+    }
+
+    protected getAllCurrentValues(): T {
+        return this.store.get(this.state);
+    }
+
     /**
-     * Subscribe to changes on a specific state key
+     * Subscribe to changes on a specific state key (override with validation)
      * @param key The state key to listen for changes
      * @param listener Callback function that receives the new and old values
      * @returns Unsubscribe function to remove the listener
@@ -152,23 +139,7 @@ export class StateController<T extends StateObject> {
                 console.warn('Warning: subscribe method should only be called from methods starting with "on"');
             }
         }
-        if (!this.listeners.has(key)) {
-            this.listeners.set(key, new Set());
-        }
-
-        const keyListeners = this.listeners.get(key)!;
-        keyListeners.add(listener as StateChangeListener<T, keyof T>);
-
-        // Return unsubscribe function
-        return () => {
-            const listeners = this.listeners.get(key);
-            if (listeners) {
-                listeners.delete(listener as StateChangeListener<T, keyof T>);
-                if (listeners.size === 0) {
-                    this.listeners.delete(key);
-                }
-            }
-        };
+        return super.subscribe(key, listener);
     }
 
     /**
@@ -219,41 +190,6 @@ export class StateController<T extends StateObject> {
         };
     }
 
-    /**
-     * Internal method to notify listeners of state changes
-     */
-    private notifyListeners(newState: Partial<T>, prevState: T): void {
-        Object.keys(newState).forEach(key => {
-            const typedKey = key as keyof T;
-            this.notifyKeyListeners(typedKey, newState[typedKey] as T[typeof typedKey], prevState[typedKey]);
-        });
-    }
-
-    /**
-     * Internal method to notify listeners for a specific key
-     */
-    private notifyKeyListeners<K extends keyof T>(key: K, newValue: T[K], oldValue: T[K]): void {
-        const keyListeners = this.listeners.get(key);
-        if (keyListeners && keyListeners.size > 0) {
-            // Only notify if the value has actually changed
-            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-                keyListeners.forEach(listener => {
-                    try {
-                        listener(newValue, oldValue);
-                    } catch (error) {
-                        console.error(`Error in state change listener for key ${String(key)}:`, error);
-                    }
-                });
-            }
-        }
-    }
-
-    /**
-     * Clear all active listeners
-     */
-    clearAllListeners() {
-        this.listeners.clear();
-    }
 
     /**
      * Automatically binds all methods of the class to the current instance
